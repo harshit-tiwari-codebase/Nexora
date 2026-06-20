@@ -32,3 +32,17 @@ export const registerValidator = [
     .matches(/[0-9]/)
     .withMessage("Password must contain at least one number"),
 ];
+
+export const loginValidator = [
+  body("email")
+    .trim()
+    .notEmpty()
+    .withMessage("Email is required")
+    .isEmail()
+    .withMessage("Please provide a valid email")
+    .normalizeEmail(),
+
+  body("password")
+    .notEmpty()
+    .withMessage("Password is required"),
+];
