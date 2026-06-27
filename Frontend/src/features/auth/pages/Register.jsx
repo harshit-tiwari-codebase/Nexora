@@ -13,15 +13,13 @@ const Register = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+ const handleSubmit = async () => {
+  const res = await registerUser(formData);
 
-    await registerUser({
-      username,
-      email,
-      password,
-    });
-  };
+  if (res.success) {
+    navigate("/login");
+  }
+};
 
   return (
     <div className="min-h-screen bg-[#09090B] text-white">

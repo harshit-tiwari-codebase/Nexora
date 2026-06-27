@@ -13,16 +13,17 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const result = await loginUser({
+    const res = await loginUser({
       email,
       password,
     });
 
-    if (result.success) {
-      navigate("/");
+    if (res.success) {
+      navigate("/app");
     }
   };
 
