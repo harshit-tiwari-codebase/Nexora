@@ -11,7 +11,6 @@ import jwt from "jsonwebtoken";
  */
 export const registerUser = async (req, res, next) => {
   try {
-    console.log("BODY:", req.body);
 
     const errors = validationResult(req);
 
