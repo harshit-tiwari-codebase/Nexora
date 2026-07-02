@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { ArrowRight } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
 import useAuth from "../hooks/useAuth";
 
 const Register = () => {
+  const navigate = useNavigate();
   const { registerUser } = useAuth();
 
   const { error, isLoading } = useSelector((state) => state.auth);
@@ -13,13 +14,15 @@ const Register = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
- const handleSubmit = async () => {
-  const res = await registerUser(formData);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  if (res.success) {
-    navigate("/login");
-  }
-};
+    const res = await registerUser({ username, email, password });
+
+    if (res.success) {
+      navigate("/login", { replace: true });
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#09090B] text-white">

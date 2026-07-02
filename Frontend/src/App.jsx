@@ -8,8 +8,8 @@ const App = () => {
 
   useEffect(() => {
     getCurrentUser();
-  }, []);
-console.log("App rendered");
+  }, [getCurrentUser]);
+
   return (
     <div className="min-h-screen bg-[#09090B]">
       <RouterProvider router={router} />

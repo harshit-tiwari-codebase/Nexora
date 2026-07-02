@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { ArrowRight } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -8,11 +8,17 @@ const Login = () => {
   const navigate = useNavigate();
   const { loginUser } = useAuth();
 
-  const { error, isLoading } = useSelector((state) => state.auth);
+  const { user, error, isLoading } = useSelector((state) => state.auth);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  // Redirect if user is already logged in
+  useEffect(() => {
+    if (!isLoading && user) {
+      navigate("/app", { replace: true });
+    }
+  }, [user, isLoading, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -23,9 +29,18 @@ const Login = () => {
     });
 
     if (res.success) {
-      navigate("/app");
+      navigate("/app", { replace: true });
     }
   };
+
+  // Show loading while checking authentication
+  if (isLoading && !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#09090B] text-white">
+        Loading...
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#09090B] text-white">
@@ -60,7 +75,6 @@ const Login = () => {
             Continue your AI workspace and pick up exactly where you left off.
           </p>
 
-          {/* Error */}
           {error && (
             <div className="mt-8 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3">
               <p className="text-sm text-red-400">{error}</p>
