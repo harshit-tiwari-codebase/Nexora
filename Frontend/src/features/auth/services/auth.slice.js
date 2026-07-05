@@ -22,12 +22,19 @@ const authSlice = createSlice({
     setLoading: (state, action) => {
       state.isLoading = action.payload;
     },
+
     setInitialized: (state, action) => {
       state.isInitialized = action.payload;
+    },
+
+    clearAuth: (state) => {
+      state.user = null;
+      state.error = null;
+      state.isLoading = false;
     },
   },
 });
 
-export const { setUser, setError, setLoading , setInitialized } = authSlice.actions;
+export const { setUser, setError, setLoading, setInitialized, clearAuth } = authSlice.actions;
 
 export default authSlice.reducer;

@@ -1,8 +1,8 @@
 import { useCallback } from "react";
 import { useDispatch } from "react-redux";
 
-import { login, register, getMe } from "../services/auth.api";
-import { setUser, setLoading, setError, setInitialized } from "../services/auth.slice";
+import { login, register, getMe, logout } from "../services/auth.api";
+import { setUser, setLoading, setError, setInitialized, clearAuth } from "../services/auth.slice";
 
 const useAuth = () => {
   const dispatch = useDispatch();
@@ -96,10 +96,35 @@ const useAuth = () => {
     }
   }, [dispatch]);
 
+  const logoutUser = async () => {
+    dispatch(setLoading(true));
+
+    try {
+      await logout();
+      dispatch(clearAuth());
+      dispatch(setInitialized(true));
+
+      return {
+        success: true,
+      };
+    } catch (error) {
+      dispatch(setUser(null));
+      dispatch(setError(error.response?.data?.message || "Something went wrong"));
+
+      return {
+        success: false,
+        message: error.response?.data?.message || "Something went wrong",
+      };
+    } finally {
+      dispatch(setLoading(false));
+    }
+  };
+
   return {
     loginUser,
     registerUser,
     getCurrentUser,
+    logoutUser,
   };
 };
 
