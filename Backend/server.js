@@ -8,7 +8,7 @@ import connectToDB from "./src/config/database.js";
 import { initSocket } from "./src/sockets/server.socket.js";
 import { testAI } from "./src/services/Ai.service.js";
 
-const PORT = process.env.PORT || 3000;
+const DEFAULT_PORT = Number(process.env.PORT) || 8000;
 
 // Connect Database
 connectToDB();
@@ -23,7 +23,22 @@ const server = http.createServer(app);
 initSocket(server);
 console.log("✅ Socket.IO Initialized");
 
-// Start Server
-server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+const startServer = (port, attempts = 0) => {
+  server.once("error", (error) => {
+    if (error.code === "EADDRINUSE" && attempts < 5) {
+      const nextPort = port + 1;
+      console.warn(`Port ${port} is busy. Trying ${nextPort}...`);
+      startServer(nextPort, attempts + 1);
+      return;
+    }
+
+    console.error(error);
+    process.exit(1);
+  });
+
+  server.listen(port, () => {
+    console.log(`Server running on port ${server.address().port}`);
+  });
+};
+
+startServer(DEFAULT_PORT);
