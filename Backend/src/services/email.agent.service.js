@@ -8,20 +8,35 @@ const model = new ChatGoogleGenerativeAI({
 });
 
 const escapeHtml = (value = "") =>
-  value
+  String(value)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
-const formatBodyHtml = (value = "") =>
-  escapeHtml(value)
+const stripMarkdownFormatting = (value = "") =>
+  String(value)
+    .replace(/\r\n/g, "\n")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/__(.*?)__/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/_(.*?)_/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/!\[([^\]]*)\]\([^)]+\)/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .trim();
+
+const formatBodyHtml = (value = "") => {
+  const normalizedValue = stripMarkdownFormatting(value);
+
+  return escapeHtml(normalizedValue)
     .replace(/\n{2,}/g, "</p><p>")
     .replace(/\n/g, "<br />")
     .trim();
+};
 
-const extractJsonPayload = (rawContent) => {
+export const extractJsonPayload = (rawContent) => {
   const text = String(rawContent || "").trim();
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
   const candidate = fenced ? fenced[1].trim() : text;
@@ -30,6 +45,21 @@ const extractJsonPayload = (rawContent) => {
   const jsonCandidate = firstBrace !== -1 && lastBrace !== -1 ? candidate.slice(firstBrace, lastBrace + 1) : candidate;
 
   return jsonCandidate;
+};
+
+export const normalizeEmailPayload = (payload = {}, { recipientName, senderName } = {}) => {
+  const normalizedPayload = {
+    subject: stripMarkdownFormatting(payload.subject || "").trim() || "A thoughtful update from Nexora",
+    greeting: stripMarkdownFormatting(payload.greeting || "").trim() || `Hello${recipientName ? ` ${recipientName}` : ""},`,
+    body: stripMarkdownFormatting(payload.body || "").trim() || "We hope this message finds you well.",
+    footerNote: stripMarkdownFormatting(payload.footerNote || "").trim() || "Thank you for taking the time to read this message.",
+  };
+
+  if (normalizedPayload.footerNote && senderName && !normalizedPayload.footerNote.toLowerCase().includes(senderName.toLowerCase())) {
+    normalizedPayload.footerNote = `${normalizedPayload.footerNote}\n${senderName}`;
+  }
+
+  return normalizedPayload;
 };
 
 const buildEmailTemplate = ({ title, greeting, body, footerNote }) => `
@@ -98,17 +128,17 @@ Sender Name: ${senderName}
     };
   }
 
-  payload.subject = payload.subject?.trim() || "A thoughtful update from Nexora";
-  payload.greeting = payload.greeting?.trim() || `Hello${recipientName ? ` ${recipientName}` : ""},`;
-  payload.body = payload.body?.trim() || "We hope this message finds you well.";
-  payload.footerNote = payload.footerNote?.trim() || "Thank you for taking the time to read this message.";
-
-  const html = buildEmailTemplate({
-    title: payload.subject,
-    greeting: payload.greeting || `Hello${recipientName ? ` ${recipientName}` : ""},`,
-    body: formatBodyHtml(payload.body || ""),
-    footerNote: formatBodyHtml(payload.footerNote || "Thanks for reading this message."),
+  const normalizedPayload = normalizeEmailPayload(payload, {
+    recipientName,
+    senderName,
   });
 
-  return sendEmail(to, payload.subject, html);
+  const html = buildEmailTemplate({
+    title: normalizedPayload.subject,
+    greeting: normalizedPayload.greeting || `Hello${recipientName ? ` ${recipientName}` : ""},`,
+    body: formatBodyHtml(normalizedPayload.body || ""),
+    footerNote: formatBodyHtml(normalizedPayload.footerNote || "Thanks for reading this message."),
+  });
+
+  return sendEmail(to, normalizedPayload.subject, html);
 };
