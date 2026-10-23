@@ -6,25 +6,17 @@ import emailRouter from "./routes/email.routes.js";
 import chatRouter from "./routes/chat.routes.js";
 import morgan from "morgan";
 import mongoose from "mongoose";
+import { isAllowedOrigin } from "./config/cors.js";
 
 const app = express();
 
 // Trust the deployment proxy so secure cookies work behind Render / Railway.
 app.set("trust proxy", 1);
 
-const allowedOrigins = (process.env.CLIENT_URL || "")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (
-        !origin ||
-        allowedOrigins.includes(origin) ||
-        /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
-      ) {
+      if (isAllowedOrigin(origin)) {
         return callback(null, true);
       }
 
@@ -57,6 +49,17 @@ app.use("/api/chats", chatRouter);
 
 app.get("/", (req, res) => {
   res.send("Hello from Nexora server");
+});
+
+app.use((error, req, res, next) => {
+  if (error.message === "Not allowed by CORS") {
+    return res.status(403).json({
+      success: false,
+      message: "Origin not allowed",
+    });
+  }
+
+  return next(error);
 });
 
 export default app;
