@@ -3,6 +3,12 @@ import { validationResult } from "express-validator";
 import { sendEmail } from "../services/mail.service.js";
 import jwt from "jsonwebtoken";
 
+const getAuthCookieOptions = (req) => ({
+  httpOnly: true,
+  secure: req.secure,
+  sameSite: req.secure ? "none" : "lax",
+});
+
 /**
  * @route   POST /api/auth/register
  * @desc    Register a new user and send email verification link
@@ -151,9 +157,7 @@ export const loginUser = async (req, res, next) => {
     });
 
     res.cookie("accessToken", token, {
-      httpOnly: true,
-      secure: false,
-      sameSite: "lax",
+      ...getAuthCookieOptions(req),
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -414,11 +418,7 @@ export const getMe = async (req, res, next) => {
 };
 
 export const logoutUser = async (req, res) => {
-  res.clearCookie("accessToken", {
-    httpOnly: true,
-    secure: false,
-    sameSite: "lax",
-  });
+  res.clearCookie("accessToken", getAuthCookieOptions(req));
 
   return res.status(200).json({
     success: true,
