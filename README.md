@@ -173,7 +173,7 @@ docker-compose up --build -d
    - `MONGODB_URI`: Production MongoDB Atlas URI
    - `JWT_SECRET`: High-entropy secret string
    - `GEMINI_API_KEY`: Google AI Studio API Key
-   - `CLIENT_URL`: URL of your deployed Frontend (e.g. `https://nexora.vercel.app`)
+   - `CLIENT_URL`: URL of your deployed Frontend; this origin is allowed for both the REST API and Socket.IO (e.g. `https://nexora.vercel.app`)
 
 ---
 

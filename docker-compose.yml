@@ -14,7 +14,7 @@ services:
       - MONGODB_URI=mongodb://mongo:27017/nexora
       - JWT_SECRET=your_super_secret_jwt_key_here
       - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - CLIENT_URL=http://localhost
+      - CLIENT_URL=https://nexora-kappa-gules.vercel.app
     depends_on:
       - mongo
 
