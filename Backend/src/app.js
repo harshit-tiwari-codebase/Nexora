@@ -8,19 +8,25 @@ import morgan from "morgan";
 
 const app = express();
 
-// Configure CORS to accept localhost on any port (5173, 5174, etc.)
+// Trust the deployment proxy so secure cookies work behind Render / Railway.
+app.set("trust proxy", 1);
+
+const allowedOrigins = (process.env.CLIENT_URL || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. mobile apps, curl, Postman)
-      // or any localhost / 127.0.0.1 port (such as 5173, 5174, etc.)
       if (
         !origin ||
-        origin === process.env.CLIENT_URL ||
+        allowedOrigins.includes(origin) ||
         /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
       ) {
         return callback(null, true);
       }
+
       return callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
