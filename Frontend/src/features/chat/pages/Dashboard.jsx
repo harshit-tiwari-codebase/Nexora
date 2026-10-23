@@ -358,7 +358,7 @@ const Dashboard = () => {
   const activeChat = chats.find((c) => c._id === activeChatId);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#070B0D] text-zinc-100">
+    <div className="flex h-dvh w-screen overflow-hidden bg-[#070B0D] text-zinc-100">
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div
@@ -369,7 +369,7 @@ const Dashboard = () => {
 
       {/* -------------------- SIDEBAR -------------------- */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-76 flex-col border-r border-[#41494F]/70 bg-[#070B0D] transition-transform duration-200 ease-in-out md:static md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-[min(18rem,90vw)] flex-col border-r border-[#41494F]/70 bg-[#070B0D] transition-transform duration-200 ease-in-out md:static md:translate-x-0 md:w-76 ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -557,19 +557,19 @@ const Dashboard = () => {
               <Menu size={20} />
             </button>
 
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-sm font-semibold text-white sm:text-base">
+            <div className="min-w-0">
+              <div className="flex min-w-0 items-center gap-2">
+                <h2 className="max-w-[42vw] truncate text-sm font-semibold text-white sm:max-w-none sm:text-base">
                   {activeChat?.title || "New Conversation"}
                 </h2>
               </div>
-              <div className="flex items-center gap-2 font-mono text-[11px] text-[#6D7C83]">
+              <div className="flex items-center gap-1.5 font-mono text-[10px] text-[#6D7C83] sm:gap-2 sm:text-[11px]">
                 <span className="flex items-center gap-1 text-[#DB2D28]">
                   <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#DB2D28]" />
                   Gemini 2.5 Flash
                 </span>
-                <span>•</span>
-                <span>Context-Aware Memory</span>
+                <span className="hidden sm:inline">•</span>
+                <span className="hidden sm:inline">Context-Aware Memory</span>
               </div>
             </div>
           </div>
@@ -587,7 +587,7 @@ const Dashboard = () => {
         </header>
 
         {/* Message Area */}
-        <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-8">
+        <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-8 sm:py-6">
           <div className="mx-auto max-w-3xl space-y-6">
             {isLoadingMessages ? (
               <div className="flex h-64 items-center justify-center font-mono text-sm text-[#6D7C83]">
@@ -598,7 +598,7 @@ const Dashboard = () => {
               </div>
             ) : messages.length === 0 ? (
               /* Empty State / Welcome Screen */
-              <div className="flex flex-col items-center justify-center pt-8 text-center sm:pt-14">
+              <div className="flex flex-col items-center justify-center pt-5 text-center sm:pt-14">
                 <div className="relative mb-5">
                   <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[#DB2D28] to-[#A41715] blur-xl opacity-25" />
                   <NexoraIcon size={56} className="relative shadow-2xl" />
@@ -609,15 +609,15 @@ const Dashboard = () => {
                   Engineered with Three.js & Gemini AI
                 </div>
 
-                <h1 className="mt-4 text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                <h1 className="mt-4 max-w-xl text-2xl font-bold tracking-tight text-white sm:text-4xl">
                   What would you like to build today?
                 </h1>
-                <p className="mt-2 max-w-md text-sm text-[#6D7C83]">
+                <p className="mt-2 max-w-md px-2 text-sm text-[#6D7C83]">
                   Nexora provides intelligent code generation, architecture planning, debugging, and software tutoring.
                 </p>
 
                 {/* Suggestions Grid */}
-                <div className="mt-8 grid w-full max-w-2xl gap-3 sm:grid-cols-2">
+                <div className="mt-6 grid w-full max-w-2xl gap-3 sm:mt-8 sm:grid-cols-2">
                   {SUGGESTIONS.map((s, idx) => {
                     const IconComponent = s.icon;
                     return (
@@ -625,7 +625,7 @@ const Dashboard = () => {
                         key={idx}
                         type="button"
                         onClick={() => handleSendMessage(s.prompt)}
-                        className="group flex flex-col items-start rounded-2xl border border-[#41494F]/80 bg-[#070B0D]/80 p-4 text-left transition duration-200 hover:-translate-y-0.5 hover:border-[#DB2D28]/50 hover:bg-[#40080A]/20 hover:shadow-xl"
+                        className="group flex min-w-0 flex-col items-start rounded-2xl border border-[#41494F]/80 bg-[#070B0D]/80 p-3.5 text-left transition duration-200 hover:-translate-y-0.5 hover:border-[#DB2D28]/50 hover:bg-[#40080A]/20 hover:shadow-xl sm:p-4"
                       >
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#DB2D28]/15 text-[#DB2D28] group-hover:bg-[#DB2D28]/25">
                           <IconComponent size={16} />
