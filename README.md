@@ -163,6 +163,8 @@ docker-compose up --build -d
 5. **Environment Variables**:
    - `VITE_API_URL`: URL of your deployed Backend (e.g. `https://api.yourdomain.com` or `https://nexora-backend.onrender.com`)
 
+   `Frontend/vercel.json` configures a SPA rewrite so React Router routes such as `/app` load correctly when opened or refreshed directly. If deploying to another static host, configure its equivalent fallback to serve `index.html` for application routes.
+
 ### B. Deploying Backend (Render / Railway / VPS)
 
 1. **Root Directory**: `Backend`
