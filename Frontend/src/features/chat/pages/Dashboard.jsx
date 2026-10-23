@@ -74,85 +74,344 @@ const MenuToggleIcon = ({ open }) => {
 };
 
 /**
- * Formatted message renderer: parses code blocks, inline code, bold text, and paragraphs
+ * Lightweight markdown renderer for AI replies:
+ * headings, paragraphs, bullet/numbered lists, blockquotes, tables, hr,
+ * fenced code blocks, inline code, bold, italic and links.
  */
-const FormattedMessage = ({ content }) => {
-  const [copiedIndex, setCopiedIndex] = useState(null);
+const INLINE_REGEX =
+  /(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(\*[^*\s][^*\n]*\*)|(\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\))/g;
 
-  const copyToClipboard = (text, index) => {
-    navigator.clipboard.writeText(text);
-    setCopiedIndex(index);
-    setTimeout(() => setCopiedIndex(null), 2000);
+const renderInline = (text, keyPrefix) => {
+  const nodes = [];
+  let last = 0;
+  let i = 0;
+  let m;
+  INLINE_REGEX.lastIndex = 0;
+
+  while ((m = INLINE_REGEX.exec(text)) !== null) {
+    if (m.index > last) nodes.push(text.slice(last, m.index));
+    const key = `${keyPrefix}-${i++}`;
+    const token = m[0];
+
+    if (m[1]) {
+      nodes.push(
+        <code
+          key={key}
+          className="rounded-md border border-[#41494F]/60 bg-[#41494F]/30 px-1.5 py-0.5 font-mono text-[0.85em] text-[#FF8A86] [overflow-wrap:anywhere]"
+        >
+          {token.slice(1, -1)}
+        </code>
+      );
+    } else if (m[2]) {
+      nodes.push(
+        <strong key={key} className="font-semibold text-white">
+          {token.slice(2, -2)}
+        </strong>
+      );
+    } else if (m[3]) {
+      nodes.push(
+        <em key={key} className="italic text-zinc-100">
+          {token.slice(1, -1)}
+        </em>
+      );
+    } else if (m[4]) {
+      nodes.push(
+        <a
+          key={key}
+          href={m[6]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-[#FF6B66] underline decoration-[#DB2D28]/50 underline-offset-2 transition hover:text-white"
+        >
+          {m[5]}
+        </a>
+      );
+    }
+    last = m.index + token.length;
+  }
+
+  if (last < text.length) nodes.push(text.slice(last));
+  return nodes;
+};
+
+const splitTableCells = (row) =>
+  row
+    .trim()
+    .replace(/^\||\|$/g, "")
+    .split("|")
+    .map((c) => c.trim());
+
+const TABLE_SEPARATOR = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
+
+const isBlockStart = (lines, i) => {
+  const line = lines[i];
+  return (
+    /^\s*```/.test(line) ||
+    /^#{1,4}\s+/.test(line) ||
+    /^\s*([-*_])\1{2,}\s*$/.test(line) ||
+    /^\s*>/.test(line) ||
+    /^\s*[-*+]\s+/.test(line) ||
+    /^\s*\d+[.)]\s+/.test(line) ||
+    (line.includes("|") && i + 1 < lines.length && TABLE_SEPARATOR.test(lines[i + 1]))
+  );
+};
+
+const parseBlocks = (content) => {
+  const lines = (content || "").replace(/\r\n/g, "\n").split("\n");
+  const blocks = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Fenced code block
+    const fence = line.match(/^\s*```(\S*)\s*$/);
+    if (fence) {
+      const codeLines = [];
+      i++;
+      while (i < lines.length && !/^\s*```\s*$/.test(lines[i])) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      i++; // skip closing fence
+      blocks.push({ type: "code", lang: fence[1] || "code", code: codeLines.join("\n") });
+      continue;
+    }
+
+    if (!line.trim()) {
+      i++;
+      continue;
+    }
+
+    // Heading
+    const heading = line.match(/^(#{1,4})\s+(.*)$/);
+    if (heading) {
+      blocks.push({ type: "heading", level: heading[1].length, text: heading[2] });
+      i++;
+      continue;
+    }
+
+    // Horizontal rule
+    if (/^\s*([-*_])\1{2,}\s*$/.test(line)) {
+      blocks.push({ type: "hr" });
+      i++;
+      continue;
+    }
+
+    // Table
+    if (line.includes("|") && i + 1 < lines.length && TABLE_SEPARATOR.test(lines[i + 1])) {
+      const header = splitTableCells(line);
+      const rows = [];
+      i += 2;
+      while (i < lines.length && lines[i].includes("|") && lines[i].trim()) {
+        rows.push(splitTableCells(lines[i]));
+        i++;
+      }
+      blocks.push({ type: "table", header, rows });
+      continue;
+    }
+
+    // Blockquote
+    if (/^\s*>/.test(line)) {
+      const quoteLines = [];
+      while (i < lines.length && /^\s*>/.test(lines[i])) {
+        quoteLines.push(lines[i].replace(/^\s*>\s?/, ""));
+        i++;
+      }
+      blocks.push({ type: "quote", text: quoteLines.join("\n") });
+      continue;
+    }
+
+    // Bullet list
+    if (/^\s*[-*+]\s+/.test(line)) {
+      const items = [];
+      while (i < lines.length && /^\s*[-*+]\s+/.test(lines[i])) {
+        const indent = lines[i].match(/^\s*/)[0].length;
+        items.push({ indent, text: lines[i].replace(/^\s*[-*+]\s+/, "") });
+        i++;
+      }
+      blocks.push({ type: "ul", items });
+      continue;
+    }
+
+    // Numbered list
+    if (/^\s*\d+[.)]\s+/.test(line)) {
+      const items = [];
+      while (i < lines.length && /^\s*\d+[.)]\s+/.test(lines[i])) {
+        const indent = lines[i].match(/^\s*/)[0].length;
+        items.push({ indent, text: lines[i].replace(/^\s*\d+[.)]\s+/, "") });
+        i++;
+      }
+      blocks.push({ type: "ol", items });
+      continue;
+    }
+
+    // Paragraph
+    const paraLines = [];
+    while (i < lines.length && lines[i].trim() && (paraLines.length === 0 || !isBlockStart(lines, i))) {
+      paraLines.push(lines[i]);
+      i++;
+    }
+    blocks.push({ type: "p", text: paraLines.join("\n") });
+  }
+
+  return blocks;
+};
+
+const CodeBlock = ({ language, code }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
-  const parts = (content || "").split(/(```[\s\S]*?```)/g);
+  return (
+    <div className="w-full max-w-full overflow-hidden rounded-xl border border-[#41494F]/80 bg-[#0B1013] shadow-lg">
+      <div className="flex items-center justify-between gap-2 border-b border-[#41494F]/60 bg-[#41494F]/15 px-3 py-1.5 sm:px-4">
+        <span className="truncate font-mono text-xs lowercase text-[#6D7C83]">{language}</span>
+        <button
+          type="button"
+          onClick={handleCopy}
+          className="flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1.5 font-mono text-xs text-[#6D7C83] transition hover:bg-[#41494F]/40 hover:text-white"
+        >
+          {copied ? (
+            <>
+              <Check size={13} className="text-emerald-400" />
+              <span className="text-emerald-400">Copied</span>
+            </>
+          ) : (
+            <>
+              <Copy size={13} />
+              <span>Copy</span>
+            </>
+          )}
+        </button>
+      </div>
+      <pre className="max-w-full overflow-x-auto p-3 font-mono text-[12px] leading-relaxed text-zinc-200 sm:p-4 sm:text-[13px]">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+};
+
+const HEADING_STYLES = {
+  1: "text-xl font-bold text-white sm:text-2xl",
+  2: "text-lg font-semibold text-white sm:text-xl",
+  3: "text-base font-semibold text-white sm:text-lg",
+  4: "text-sm font-semibold text-zinc-100 sm:text-base",
+};
+
+const FormattedMessage = ({ content }) => {
+  const blocks = parseBlocks(content);
 
   return (
-    <div className="min-w-0 space-y-3 leading-relaxed text-zinc-200">
-      {parts.map((part, index) => {
-        if (part.startsWith("```") && part.endsWith("```")) {
-          const lines = part.slice(3, -3).trim().split("\n");
-          let language = "code";
-          let code = part.slice(3, -3).trim();
+    <div className="min-w-0 space-y-3.5 break-words text-[15px] leading-7 text-zinc-200 [overflow-wrap:anywhere]">
+      {blocks.map((block, idx) => {
+        const key = `b-${idx}`;
 
-          if (lines.length > 1 && /^[a-zA-Z0-9_-]+$/.test(lines[0].trim())) {
-            language = lines[0].trim();
-            code = lines.slice(1).join("\n");
+        switch (block.type) {
+          case "code":
+            return <CodeBlock key={key} language={block.lang} code={block.code} />;
+
+          case "heading":
+            return (
+              <div
+                key={key}
+                role="heading"
+                aria-level={block.level}
+                className={`${HEADING_STYLES[block.level]} !mt-5 leading-snug first:!mt-0`}
+              >
+                {renderInline(block.text, key)}
+              </div>
+            );
+
+          case "hr":
+            return <hr key={key} className="border-[#41494F]/60" />;
+
+          case "quote":
+            return (
+              <blockquote
+                key={key}
+                className="whitespace-pre-wrap rounded-r-lg border-l-2 border-[#DB2D28]/70 bg-[#40080A]/20 py-2 pl-4 pr-3 text-zinc-300"
+              >
+                {renderInline(block.text, key)}
+              </blockquote>
+            );
+
+          case "ul":
+          case "ol": {
+            const ListTag = block.type;
+            return (
+              <ListTag
+                key={key}
+                className={`space-y-1.5 pl-5 ${
+                  block.type === "ul"
+                    ? "list-disc marker:text-[#DB2D28]"
+                    : "list-decimal marker:font-mono marker:text-[#6D7C83]"
+                }`}
+              >
+                {block.items.map((item, itemIdx) => (
+                  <li
+                    key={`${key}-${itemIdx}`}
+                    className="pl-1"
+                    style={{
+                      marginLeft: `${Math.min(Math.floor(item.indent / 2), 3)}rem`,
+                    }}
+                  >
+                    {renderInline(item.text, `${key}-${itemIdx}`)}
+                  </li>
+                ))}
+              </ListTag>
+            );
           }
 
-          return (
-            <div
-              key={index}
-              className="my-3 w-full max-w-full overflow-hidden rounded-xl border border-[#41494F]/80 bg-[#070B0D] shadow-xl"
-            >
-              <div className="flex items-center justify-between gap-2 border-b border-[#41494F]/80 bg-[#070B0D] px-3 py-2 text-xs text-[#6D7C83] sm:px-4">
-                <div className="flex min-w-0 items-center gap-2">
-                  <div className="hidden gap-1.5 xs:flex sm:flex">
-                    <span className="h-2.5 w-2.5 rounded-full bg-[#DB2D28]" />
-                    <span className="h-2.5 w-2.5 rounded-full bg-[#6D7C83]/60" />
-                    <span className="h-2.5 w-2.5 rounded-full bg-[#41494F]" />
-                  </div>
-                  <span className="truncate font-mono lowercase text-[#6D7C83]">{language}</span>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => copyToClipboard(code, index)}
-                  className="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-mono text-xs text-[#6D7C83] transition hover:bg-[#41494F]/40 hover:text-white"
-                >
-                  {copiedIndex === index ? (
-                    <>
-                      <Check size={13} className="text-emerald-400" />
-                      <span className="text-emerald-400">Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy size={13} />
-                      <span>Copy</span>
-                    </>
-                  )}
-                </button>
+          case "table":
+            return (
+              <div key={key} className="w-full overflow-x-auto rounded-xl border border-[#41494F]/70">
+                <table className="w-full border-collapse text-left text-sm">
+                  <thead className="bg-[#41494F]/25 text-zinc-100">
+                    <tr>
+                      {block.header.map((cell, cIdx) => (
+                        <th key={cIdx} className="whitespace-nowrap px-3 py-2 font-semibold">
+                          {renderInline(cell, `${key}-h${cIdx}`)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {block.rows.map((row, rIdx) => (
+                      <tr key={rIdx} className="border-t border-[#41494F]/50">
+                        {row.map((cell, cIdx) => (
+                          <td key={cIdx} className="px-3 py-2 align-top text-zinc-300">
+                            {renderInline(cell, `${key}-${rIdx}-${cIdx}`)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
+            );
 
-              <pre className="max-w-full overflow-x-auto p-3 font-mono text-[12px] leading-relaxed text-zinc-200 sm:p-4 sm:text-[13px]">
-                <code>{code}</code>
-              </pre>
-            </div>
-          );
-        }
-
-        return (
-          <div key={index} className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
-            {part.split("\n\n").map((paragraph, pIdx) => (
-              <p key={pIdx} className="mb-2.5 last:mb-0">
-                {paragraph}
+          default:
+            return (
+              <p key={key} className="whitespace-pre-wrap">
+                {renderInline(block.text, key)}
               </p>
-            ))}
-          </div>
-        );
+            );
+        }
       })}
     </div>
   );
+};
+
+const formatTime = (iso) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 };
 
 const Dashboard = () => {
@@ -674,56 +933,53 @@ const Dashboard = () => {
               /* Messages Stream */
               messages.map((message, index) => {
                 const isUser = message.role === "user";
+                const time = formatTime(message.createdAt);
+
+                if (isUser) {
+                  return (
+                    <div key={message._id || `msg-${index}`} className="flex justify-end">
+                      <div className="max-w-[88%] rounded-2xl rounded-tr-xs bg-gradient-to-r from-[#DB2D28] to-[#A41715] px-3.5 py-3 text-white shadow-lg shadow-[#DB2D28]/20 sm:max-w-[78%] sm:px-5 sm:py-3.5">
+                        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed [overflow-wrap:anywhere] sm:text-[15px]">
+                          {message.content}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
 
                 return (
-                  <div
-                    key={message._id || `msg-${index}`}
-                    className={`flex gap-2.5 sm:gap-4 ${isUser ? "justify-end" : "justify-start"}`}
-                  >
-                    {!isUser && (
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#070B0D] shadow-md ring-1 ring-[#DB2D28]/40">
-                        <NexoraIcon size={20} />
-                      </div>
-                    )}
+                  <div key={message._id || `msg-${index}`} className="flex gap-2.5 sm:gap-4">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#070B0D] shadow-md ring-1 ring-[#DB2D28]/40">
+                      <NexoraIcon size={20} />
+                    </div>
 
-                    <div className="min-w-0 max-w-[88%] space-y-1.5 sm:max-w-[78%]">
-                      <div
-                        className={`rounded-2xl px-3.5 py-3 sm:px-5 sm:py-4 ${
-                          isUser
-                            ? "rounded-tr-xs bg-gradient-to-r from-[#DB2D28] to-[#A41715] text-white shadow-lg shadow-[#DB2D28]/20"
-                            : "rounded-tl-xs border border-[#41494F]/80 bg-[#070B0D] text-zinc-100 shadow-md backdrop-blur-sm"
-                        }`}
-                      >
-                        {isUser ? (
-                          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed [overflow-wrap:anywhere] sm:text-[15px]">
-                            {message.content}
-                          </p>
-                        ) : (
-                          <FormattedMessage content={message.content} />
-                        )}
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1.5 flex items-center gap-2 font-mono text-[11px] text-[#6D7C83]">
+                        <span className="font-semibold text-zinc-300">Nexora</span>
+                        {time && <span>{time}</span>}
                       </div>
 
-                      {!isUser && (
-                        <div className="flex items-center gap-2 px-1 font-mono text-[11px] text-[#6D7C83]">
-                          <button
-                            type="button"
-                            onClick={() => handleCopyMessage(message._id, message.content)}
-                            className="flex items-center gap-1 rounded px-1.5 py-1 hover:bg-[#41494F]/30 hover:text-white"
-                          >
-                            {copiedMessageId === message._id ? (
-                              <>
-                                <Check size={11} className="text-emerald-400" />
-                                <span className="text-emerald-400">Copied</span>
-                              </>
-                            ) : (
-                              <>
-                                <Copy size={11} />
-                                <span>Copy</span>
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      )}
+                      <FormattedMessage content={message.content} />
+
+                      <div className="mt-2.5 flex items-center gap-1 font-mono text-[11px] text-[#6D7C83]">
+                        <button
+                          type="button"
+                          onClick={() => handleCopyMessage(message._id, message.content)}
+                          className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 transition hover:bg-[#41494F]/30 hover:text-white"
+                        >
+                          {copiedMessageId === message._id ? (
+                            <>
+                              <Check size={12} className="text-emerald-400" />
+                              <span className="text-emerald-400">Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={12} />
+                              <span>Copy</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
