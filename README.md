@@ -170,13 +170,15 @@ docker-compose up --build -d
 3. **Start Command**: `node server.js`
 4. **Environment Variables**:
    - `PORT`: `8000` (or dynamic port provided by host)
-   - `MONGODB_URI`: Production MongoDB Atlas URI
+   - `MONGODB_URI`: Production MongoDB Atlas URI (the legacy `MONGO_URI` name is also accepted)
    - `JWT_SECRET`: High-entropy secret string
    - `GEMINI_API_KEY`: Google AI Studio API Key
    - `CLIENT_URL`: URL of your deployed Frontend; this origin is allowed for both the REST API and Socket.IO (e.g. `https://nexora.vercel.app`)
    - `VITE_API_URL` (Frontend): URL of your deployed Backend (e.g. `https://nexora-backend-48xn.onrender.com`)
 
    For separate HTTPS frontend and backend deployments, set `CLIENT_URL` to the frontend's exact origin and `VITE_API_URL` to the backend URL. The API sets its authentication cookie as `SameSite=None; Secure` over HTTPS so browsers send it with cross-site requests. After deploying this change, sign in again so the browser receives a new cookie.
+
+   `GET /api/health` reports whether the API and MongoDB are ready. For an external uptime monitor, use this URL as its health-check target. A monitor can send inbound requests periodically and reduce idle spin-down, but a health endpoint cannot guarantee a Render free instance remains running; use an always-on service plan when persistent availability is required.
 
 ---
 

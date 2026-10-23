@@ -393,7 +393,9 @@ seconds...
  */
 export const getMe = async (req, res, next) => {
   try {
-    const user = await UserModel.findById(req.userId);
+    const user = await UserModel.findById(req.userId)
+      .select("username email verified createdAt")
+      .lean();
 
     if (!user) {
       return res.status(404).json({

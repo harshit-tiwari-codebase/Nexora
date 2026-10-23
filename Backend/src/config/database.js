@@ -1,14 +1,14 @@
 import mongoose from "mongoose";
 
 async function connectToDB() {
-    try {
-        await mongoose.connect(process.env.MONGO_URI);
-        console.log("Connected to Database");
-    } catch (error) {
-        console.log("Database Connection Failed");
-        console.error(error.message);
-        process.exit(1);
-    }
+  const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
+
+  if (!mongoUri) {
+    throw new Error("Missing database configuration: set MONGODB_URI.");
+  }
+
+  await mongoose.connect(mongoUri);
+  console.log("Connected to Database");
 }
 
 export default connectToDB;
