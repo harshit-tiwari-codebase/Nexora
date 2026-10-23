@@ -59,7 +59,34 @@ app.use((error, req, res, next) => {
     });
   }
 
-  return next(error);
+  const statusCode =
+    Number.isInteger(error.statusCode) &&
+    error.statusCode >= 400 &&
+    error.statusCode < 600
+      ? error.statusCode
+      : 500;
+
+  if (statusCode >= 500) {
+    console.error("Request failed:", error);
+  }
+
+  if (error.retryAfterSeconds) {
+    res.set("Retry-After", String(error.retryAfterSeconds));
+  }
+
+  return res.status(statusCode).json({
+    success: false,
+    message:
+      error.expose === true
+        ? error.message
+        : statusCode === 500
+          ? "An unexpected server error occurred."
+          : error.message,
+    ...(error.code && { code: error.code }),
+    ...(error.retryAfterSeconds && {
+      retryAfterSeconds: error.retryAfterSeconds,
+    }),
+  });
 });
 
 export default app;

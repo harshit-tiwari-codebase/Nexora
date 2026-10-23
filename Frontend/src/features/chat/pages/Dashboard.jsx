@@ -570,12 +570,15 @@ const Dashboard = () => {
       }
     } catch (error) {
       console.error("Failed to send message:", error);
+      const errorMessage =
+        error.response?.data?.message ||
+        "The message could not be sent. Please try again.";
       setMessages((prev) => [
         ...prev,
         {
           _id: "err-" + Date.now(),
           chat: currentChatId,
-          content: "Sorry, I encountered an error while processing your request. Please try again.",
+          content: errorMessage,
           role: "ai",
           createdAt: new Date().toISOString(),
         },

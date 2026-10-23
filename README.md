@@ -182,6 +182,8 @@ docker-compose up --build -d
 
    `GET /api/health` reports whether the API and MongoDB are ready. For an external uptime monitor, use this URL as its health-check target. A monitor can send inbound requests periodically and reduce idle spin-down, but a health endpoint cannot guarantee a Render free instance remains running; use an always-on service plan when persistent availability is required.
 
+   Chat generation disables automatic provider retries so exhausted Gemini quotas return promptly as HTTP 429 with retry timing instead of waiting through long retries and appearing as a server error. A 429 still requires waiting for Google's quota reset or raising the Gemini project's quota.
+
 ---
 
 ## 🔒 License

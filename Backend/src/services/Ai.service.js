@@ -6,11 +6,41 @@ import "../config/env.js";
 const model = new ChatGoogleGenerativeAI({
   model: "gemini-2.5-flash-lite",
   apiKey: process.env.GEMINI_API_KEY,
+  maxRetries: 0,
 });
 
 // System prompt that defines Nexora's personality
 const SYSTEM_PROMPT = `You are Nexora, a helpful, intelligent, and friendly AI coding and conversational assistant.
 Provide clear, accurate, and concise answers. When writing code, provide clean, well-explained code snippets with markdown formatting.`;
+
+export const getRetryAfterSeconds = (message = "") => {
+  const match = message.match(/"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/i);
+  return match ? Math.ceil(Number(match[1])) : undefined;
+};
+
+export const toAiProviderError = (providerError) => {
+  const details = String(providerError?.message || "");
+  const status =
+    Number(providerError?.status || providerError?.statusCode) ||
+    Number(details.match(/\[(\d{3})\s/)?.[1]);
+  const isQuotaError =
+    status === 429 && /quota|resource_exhausted|rate limit/i.test(details);
+  const retryAfterSeconds = getRetryAfterSeconds(details);
+  const error = new Error(
+    isQuotaError
+      ? "The AI provider's request quota has been reached. Please try again after the quota resets or increase the provider quota."
+      : status === 429
+        ? "The AI provider is rate-limiting requests. Please try again shortly."
+        : "The AI provider is temporarily unavailable. Please try again."
+  );
+
+  error.statusCode = status === 429 ? 429 : 502;
+  error.code = isQuotaError ? "AI_QUOTA_EXCEEDED" : "AI_PROVIDER_UNAVAILABLE";
+  error.retryAfterSeconds = retryAfterSeconds;
+  error.expose = true;
+
+  return error;
+};
 
 /**
  * Generate AI reply using Gemini with chat history context
@@ -42,8 +72,14 @@ export const generateChatReply = async ({ history = [], prompt }) => {
     const response = await model.invoke(formattedMessages);
     return response.content?.toString() || "";
   } catch (error) {
-    console.error("AI Generation Error:", error.message);
-    throw new Error("Failed to generate AI response. Please try again.");
+    const aiError = toAiProviderError(error);
+    console.error("AI Generation Error:", {
+      code: aiError.code,
+      statusCode: aiError.statusCode,
+      retryAfterSeconds: aiError.retryAfterSeconds,
+      message: error.message,
+    });
+    throw aiError;
   }
 };
 
