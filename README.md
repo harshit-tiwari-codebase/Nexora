@@ -114,6 +114,7 @@ MONGODB_URI=your_mongodb_connection_string
 JWT_SECRET=your_jwt_secret_key
 GEMINI_API_KEY=your_gemini_api_key
 GROQ_API_KEY=your_groq_api_key
+GROQ_MODEL=openai/gpt-oss-120b
 CLIENT_URL=http://localhost:5173
 ```
 Start the backend server:
@@ -177,6 +178,7 @@ docker-compose up --build -d
    - `JWT_SECRET`: High-entropy secret string
    - `GEMINI_API_KEY`: Google AI Studio API key (optional if Groq is configured)
    - `GROQ_API_KEY`: Groq API key (optional; used as fallback after Gemini, or by itself)
+   - `GROQ_MODEL`: Active Groq chat model ID (defaults to `openai/gpt-oss-120b`)
    - `CLIENT_URL`: URL of your deployed Frontend; this origin is allowed for both the REST API and Socket.IO (e.g. `https://nexora.vercel.app`)
    - `VITE_API_URL` (Frontend): URL of your deployed Backend (e.g. `https://nexora-backend-48xn.onrender.com`)
 

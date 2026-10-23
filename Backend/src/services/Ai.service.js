@@ -6,7 +6,8 @@ const SYSTEM_PROMPT = `You are Nexora, a helpful, intelligent, and friendly AI c
 Provide clear, accurate, and concise answers. When writing code, provide clean, well-explained code snippets with markdown formatting.`;
 const MAX_HISTORY = 15;
 const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
-const GROQ_MODEL = "llama-3.3-70b-versatile";
+const DEFAULT_GROQ_MODEL = "openai/gpt-oss-120b";
+const getGroqModel = () => process.env.GROQ_MODEL || DEFAULT_GROQ_MODEL;
 
 export const getRetryAfterSeconds = (message = "") => {
   const match = message.match(/"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"/i);
@@ -66,6 +67,7 @@ const callGemini = async (modelName, messages) => {
 };
 
 const callGroq = async (messages) => {
+  const model = getGroqModel();
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -74,7 +76,7 @@ const callGroq = async (messages) => {
     },
     signal: AbortSignal.timeout(30_000),
     body: JSON.stringify({
-      model: GROQ_MODEL,
+      model,
       max_tokens: 2048,
       messages: messages.map((message) => ({
         role:
@@ -92,6 +94,17 @@ const callGroq = async (messages) => {
     const error = new Error(`Groq request failed with status ${response.status}`);
     error.status = response.status;
     error.retryAfter = Number(response.headers.get("retry-after")) || undefined;
+    const body = await response.text();
+    try {
+      const details = JSON.parse(body)?.error;
+      error.providerMessage =
+        typeof details === "string" ? details : details?.message || details?.code;
+    } catch {
+      error.providerMessage = body;
+    }
+    error.providerMessage = error.providerMessage
+      ?.replace(/\s+/g, " ")
+      .slice(0, 300);
     throw error;
   }
 
@@ -121,8 +134,9 @@ const generateWithFallback = async (messages) => {
   }
 
   if (process.env.GROQ_API_KEY) {
+    const model = getGroqModel();
     providers.push({
-      name: `Groq/${GROQ_MODEL}`,
+      name: `Groq/${model}`,
       call: () => callGroq(messages),
     });
   }
@@ -146,7 +160,11 @@ const generateWithFallback = async (messages) => {
     } catch (providerError) {
       const error = toAiProviderError(providerError);
       console.warn(
-        `[AI] ${provider.name} failed with status ${error.providerStatus || "unknown"}`
+        `[AI] ${provider.name} failed with status ${error.providerStatus || "unknown"}${
+          providerError.providerMessage
+            ? `: ${providerError.providerMessage}`
+            : ""
+        }`
       );
       retryAfterSeconds ||= error.retryAfterSeconds;
       lastError = error;

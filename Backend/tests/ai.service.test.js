@@ -54,12 +54,15 @@ test("maps a Groq rate limit and preserves its retry-after header", () => {
 test("generates a reply with Groq when Gemini is not configured", async () => {
   const previousGeminiKey = process.env.GEMINI_API_KEY;
   const previousGroqKey = process.env.GROQ_API_KEY;
+  const previousGroqModel = process.env.GROQ_MODEL;
   const previousFetch = globalThis.fetch;
 
   process.env.GEMINI_API_KEY = "";
   process.env.GROQ_API_KEY = "test-groq-key";
+  process.env.GROQ_MODEL = "openai/gpt-oss-120b";
   globalThis.fetch = async (url, options) => {
     assert.equal(url, "https://api.groq.com/openai/v1/chat/completions");
+    assert.equal(JSON.parse(options.body).model, "openai/gpt-oss-120b");
     assert.equal(options.headers.Authorization, "Bearer test-groq-key");
 
     return {
@@ -81,6 +84,9 @@ test("generates a reply with Groq when Gemini is not configured", async () => {
 
     if (previousGroqKey === undefined) delete process.env.GROQ_API_KEY;
     else process.env.GROQ_API_KEY = previousGroqKey;
+
+    if (previousGroqModel === undefined) delete process.env.GROQ_MODEL;
+    else process.env.GROQ_MODEL = previousGroqModel;
 
     globalThis.fetch = previousFetch;
   }
