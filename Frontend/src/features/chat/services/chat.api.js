@@ -1,7 +1,9 @@
 import axios from "axios";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+
 const API = axios.create({
-  baseURL: "http://localhost:8000",
+  baseURL: API_BASE_URL,
   withCredentials: true,
 });
 
@@ -49,6 +51,6 @@ export async function deleteChatById(chatId) {
  * Update chat title
  */
 export async function updateChatTitle(chatId, title) {
-  const response = await API.patch(`/api/chats/${chatId}`, { title });
+  const response = await API.put(`/api/chats/${chatId}`, { title });
   return response.data.chat;
 }
