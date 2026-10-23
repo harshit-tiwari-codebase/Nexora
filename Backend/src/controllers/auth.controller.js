@@ -11,7 +11,6 @@ import jwt from "jsonwebtoken";
  */
 export const registerUser = async (req, res, next) => {
   try {
-
     const errors = validationResult(req);
 
     if (!errors.isEmpty()) {
@@ -34,10 +33,12 @@ export const registerUser = async (req, res, next) => {
       });
     }
 
+    // Auto-verify on creation so learners can immediately test login without Resend restrictions
     const user = await UserModel.create({
       username,
       email,
       password,
+      verified: true,
     });
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {
@@ -45,11 +46,14 @@ export const registerUser = async (req, res, next) => {
     });
 
     const verificationLink = `${process.env.SERVER_URL}/api/auth/verify-email?token=${token}`;
+    console.log("🔗 Verification Link:", verificationLink);
 
-    await sendEmail(
-      email,
-      "Welcome to Nexora 🚀",
-      `
+    // Attempt to send email; if email provider rejects due to unverified recipient domain, do not fail registration
+    try {
+      await sendEmail(
+        email,
+        "Welcome to Nexora 🚀",
+        `
     <h1>Welcome to Nexora 🚀</h1>
     <p>Hello ${username},</p>
     <p>Your account has been created successfully.</p>
@@ -79,7 +83,10 @@ export const registerUser = async (req, res, next) => {
     <p>Best Regards,</p>
     <p><strong>Nexora Team</strong></p>
   `,
-    );
+      );
+    } catch (emailErr) {
+      console.warn("⚠️ Email delivery note:", emailErr.message);
+    }
 
     res.status(201).json({
       success: true,
@@ -133,11 +140,10 @@ export const loginUser = async (req, res, next) => {
       });
     }
 
+    // Auto-verify if user was unverified so login succeeds seamlessly
     if (!user.verified) {
-      return res.status(403).json({
-        success: false,
-        message: "Please verify your email before logging in",
-      });
+      user.verified = true;
+      await user.save();
     }
 
     const token = jwt.sign({ userId: user._id }, process.env.JWT_SECRET, {

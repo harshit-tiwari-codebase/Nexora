@@ -23,7 +23,9 @@ const useAuth = () => {
       };
     } catch (error) {
       const message =
-        error.response?.data?.message || "Something went wrong";
+        error.response?.data?.errors?.[0]?.msg ||
+        error.response?.data?.message ||
+        "Something went wrong";
 
       dispatch(setError(message));
 
@@ -52,7 +54,9 @@ const useAuth = () => {
       };
     } catch (error) {
       const message =
-        error.response?.data?.message || "Something went wrong";
+        error.response?.data?.errors?.[0]?.msg ||
+        error.response?.data?.message ||
+        "Something went wrong";
 
       dispatch(setError(message));
 
@@ -83,7 +87,11 @@ const useAuth = () => {
 
       if (error.response?.status !== 401) {
         dispatch(
-          setError(error.response?.data?.message || "Something went wrong")
+          setError(
+            error.response?.data?.errors?.[0]?.msg ||
+              error.response?.data?.message ||
+              "Something went wrong"
+          )
         );
       }
 
@@ -100,20 +108,25 @@ const useAuth = () => {
     dispatch(setLoading(true));
 
     try {
-      await logout();
+      const data = await logout();
+
       dispatch(clearAuth());
-      dispatch(setInitialized(true));
 
       return {
         success: true,
+        message: data?.message || "Logged out successfully",
       };
     } catch (error) {
-      dispatch(setUser(null));
-      dispatch(setError(error.response?.data?.message || "Something went wrong"));
+      const message =
+        error.response?.data?.errors?.[0]?.msg ||
+        error.response?.data?.message ||
+        "Something went wrong";
+
+      dispatch(setError(message));
 
       return {
         success: false,
-        message: error.response?.data?.message || "Something went wrong",
+        message,
       };
     } finally {
       dispatch(setLoading(false));

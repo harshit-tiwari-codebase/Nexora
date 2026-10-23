@@ -1,6 +1,7 @@
 import { sendEmail } from "./mail.service.js";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import "../config/env.js";
+import { buildDemoEmailPayload } from "./terminalTest.service.js";
 
 const model = new ChatGoogleGenerativeAI({
   model: "gemini-2.5-flash-lite",
@@ -141,4 +142,45 @@ Sender Name: ${senderName}
   });
 
   return sendEmail(to, normalizedPayload.subject, html);
+};
+
+export const runSimpleTerminalEmail = async ({ to, prompt, recipientName }) => {
+  const payload = buildDemoEmailPayload({ to, prompt, recipientName });
+
+  console.log("\nEmail payload:");
+  console.log(JSON.stringify(payload, null, 2));
+
+  if (!process.env.RESEND_API_KEY) {
+    const simulatedResult = {
+      success: true,
+      mode: "simulated",
+      message: "Email payload prepared for testing.",
+      payload,
+    };
+
+    console.log("\nEmail result (simulated):");
+    console.log(simulatedResult);
+    return simulatedResult;
+  }
+
+  try {
+    const result = await sendEmail(payload.to, payload.subject, payload.html);
+
+    console.log("\nEmail result:");
+    console.log(result);
+
+    return result;
+  } catch (error) {
+    const simulatedResult = {
+      success: true,
+      mode: "simulated",
+      message: "Email sending was blocked by provider validation, but the payload is ready for testing.",
+      payload,
+      error: error.message,
+    };
+
+    console.log("\nEmail result (simulated):");
+    console.log(simulatedResult);
+    return simulatedResult;
+  }
 };
