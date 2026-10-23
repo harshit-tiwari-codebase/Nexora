@@ -9,7 +9,6 @@ import {
   MessageSquare,
   LogOut,
   Search,
-  Menu,
   X,
   Copy,
   Check,
@@ -60,6 +59,21 @@ const SUGGESTIONS = [
 ];
 
 /**
+ * Hamburger icon that morphs into an X (and back) based on `open`
+ */
+const MenuToggleIcon = ({ open }) => {
+  const bar =
+    "absolute left-0 h-0.5 w-5 rounded-full bg-current transition-all duration-300 ease-out motion-reduce:transition-none";
+  return (
+    <span className="relative block h-5 w-5" aria-hidden="true">
+      <span className={`${bar} ${open ? "top-[9px] rotate-45" : "top-1"}`} />
+      <span className={`${bar} top-[9px] ${open ? "scale-x-0 opacity-0" : ""}`} />
+      <span className={`${bar} ${open ? "top-[9px] -rotate-45" : "top-[14px]"}`} />
+    </span>
+  );
+};
+
+/**
  * Formatted message renderer: parses code blocks, inline code, bold text, and paragraphs
  */
 const FormattedMessage = ({ content }) => {
@@ -71,10 +85,10 @@ const FormattedMessage = ({ content }) => {
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  const parts = content.split(/(```[\s\S]*?```)/g);
+  const parts = (content || "").split(/(```[\s\S]*?```)/g);
 
   return (
-    <div className="space-y-3 leading-relaxed text-zinc-200">
+    <div className="min-w-0 space-y-3 leading-relaxed text-zinc-200">
       {parts.map((part, index) => {
         if (part.startsWith("```") && part.endsWith("```")) {
           const lines = part.slice(3, -3).trim().split("\n");
@@ -89,22 +103,22 @@ const FormattedMessage = ({ content }) => {
           return (
             <div
               key={index}
-              className="my-3 overflow-hidden rounded-xl border border-[#41494F]/80 bg-[#070B0D] shadow-xl"
+              className="my-3 w-full max-w-full overflow-hidden rounded-xl border border-[#41494F]/80 bg-[#070B0D] shadow-xl"
             >
-              <div className="flex items-center justify-between border-b border-[#41494F]/80 bg-[#070B0D] px-4 py-2 text-xs text-[#6D7C83]">
-                <div className="flex items-center gap-2">
-                  <div className="flex gap-1.5">
+              <div className="flex items-center justify-between gap-2 border-b border-[#41494F]/80 bg-[#070B0D] px-3 py-2 text-xs text-[#6D7C83] sm:px-4">
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="hidden gap-1.5 xs:flex sm:flex">
                     <span className="h-2.5 w-2.5 rounded-full bg-[#DB2D28]" />
                     <span className="h-2.5 w-2.5 rounded-full bg-[#6D7C83]/60" />
                     <span className="h-2.5 w-2.5 rounded-full bg-[#41494F]" />
                   </div>
-                  <span className="font-mono text-[#6D7C83] lowercase">{language}</span>
+                  <span className="truncate font-mono lowercase text-[#6D7C83]">{language}</span>
                 </div>
 
                 <button
                   type="button"
                   onClick={() => copyToClipboard(code, index)}
-                  className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 font-mono text-xs text-[#6D7C83] transition hover:bg-[#41494F]/40 hover:text-white"
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-mono text-xs text-[#6D7C83] transition hover:bg-[#41494F]/40 hover:text-white"
                 >
                   {copiedIndex === index ? (
                     <>
@@ -114,13 +128,13 @@ const FormattedMessage = ({ content }) => {
                   ) : (
                     <>
                       <Copy size={13} />
-                      <span>Copy Code</span>
+                      <span>Copy</span>
                     </>
                   )}
                 </button>
               </div>
 
-              <pre className="overflow-x-auto p-4 font-mono text-[13px] leading-relaxed text-zinc-200">
+              <pre className="max-w-full overflow-x-auto p-3 font-mono text-[12px] leading-relaxed text-zinc-200 sm:p-4 sm:text-[13px]">
                 <code>{code}</code>
               </pre>
             </div>
@@ -128,7 +142,7 @@ const FormattedMessage = ({ content }) => {
         }
 
         return (
-          <div key={index} className="whitespace-pre-wrap">
+          <div key={index} className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
             {part.split("\n\n").map((paragraph, pIdx) => (
               <p key={pIdx} className="mb-2.5 last:mb-0">
                 {paragraph}
@@ -175,6 +189,24 @@ const Dashboard = () => {
     scrollToBottom();
   }, [messages, isSending]);
 
+  // Auto-grow the textarea (up to a max height) as the user types
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [inputMessage]);
+
+  // Lock body scroll while the mobile sidebar is open
+  useEffect(() => {
+    if (!isSidebarOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isSidebarOpen]);
+
   useEffect(() => {
     const fetchUserChats = async () => {
       try {
@@ -196,7 +228,10 @@ const Dashboard = () => {
   }, []);
 
   const selectChat = async (chatId) => {
-    if (chatId === activeChatId) return;
+    if (chatId === activeChatId) {
+      setIsSidebarOpen(false);
+      return;
+    }
 
     setActiveChatId(chatId);
     setIsSidebarOpen(false);
@@ -226,7 +261,7 @@ const Dashboard = () => {
   };
 
   const handleSendMessage = async (textToSend) => {
-    const text = (textToSend || inputMessage).trim();
+    const text = (typeof textToSend === "string" ? textToSend : inputMessage).trim();
     if (!text || isSending) return;
 
     setInputMessage("");
@@ -358,32 +393,25 @@ const Dashboard = () => {
   const activeChat = chats.find((c) => c._id === activeChatId);
 
   return (
-    <div className="flex h-dvh w-screen overflow-hidden bg-[#070B0D] text-zinc-100">
+    <div className="flex h-dvh w-full overflow-hidden bg-[#070B0D] text-zinc-100">
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/80 backdrop-blur-sm md:hidden"
+          className="fixed inset-x-0 bottom-0 top-14 z-40 bg-black/80 backdrop-blur-sm sm:top-16 md:hidden"
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
 
       {/* -------------------- SIDEBAR -------------------- */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[min(18rem,90vw)] flex-col border-r border-[#41494F]/70 bg-[#070B0D] transition-transform duration-200 ease-in-out md:static md:translate-x-0 md:w-76 ${
+        className={`fixed bottom-0 left-0 top-14 z-50 flex w-[min(18rem,88vw)] shrink-0 flex-col sm:top-16 border-r border-[#41494F]/70 bg-[#070B0D] transition-transform duration-200 ease-in-out md:static md:top-auto md:w-72 md:translate-x-0 lg:w-80 ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         {/* Brand Header */}
-        <div className="flex h-16 items-center justify-between border-b border-[#41494F]/70 px-4">
+        <div className="flex h-14 shrink-0 items-center justify-between border-b border-[#41494F]/70 px-4 sm:h-16">
           <NexoraLogo size="md" subtitle="AI Workspace" />
 
-          <button
-            type="button"
-            className="rounded-lg p-1.5 text-[#6D7C83] hover:bg-[#41494F]/30 hover:text-white md:hidden"
-            onClick={() => setIsSidebarOpen(false)}
-          >
-            <X size={18} />
-          </button>
         </div>
 
         {/* Action: New Chat Button */}
@@ -412,11 +440,12 @@ const Dashboard = () => {
               placeholder="Search conversations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full rounded-xl border border-[#41494F] bg-[#070B0D] py-2 pl-8 pr-8 text-xs text-zinc-200 placeholder-[#6D7C83] outline-none transition focus:border-[#DB2D28]/60 focus:ring-1 focus:ring-[#DB2D28]/30"
+              className="w-full rounded-xl border border-[#41494F] bg-[#070B0D] py-2 pl-8 pr-8 text-base text-zinc-200 placeholder-[#6D7C83] outline-none transition focus:border-[#DB2D28]/60 focus:ring-1 focus:ring-[#DB2D28]/30 sm:text-xs"
             />
             {searchQuery && (
               <button
                 type="button"
+                aria-label="Clear search"
                 onClick={() => setSearchQuery("")}
                 className="absolute right-2.5 text-[#6D7C83] hover:text-white"
               >
@@ -427,8 +456,8 @@ const Dashboard = () => {
         </div>
 
         {/* Chat List */}
-        <div className="flex-1 overflow-y-auto px-2 py-1 scrollbar-thin">
-          <div className="mb-2 px-2 text-[11px] font-mono font-semibold uppercase tracking-wider text-[#6D7C83]">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-2 py-1 scrollbar-thin">
+          <div className="mb-2 px-2 font-mono text-[11px] font-semibold uppercase tracking-wider text-[#6D7C83]">
             Recent Conversations
           </div>
 
@@ -464,7 +493,7 @@ const Dashboard = () => {
                     <div className="flex min-w-0 flex-1 items-center gap-2.5">
                       <MessageSquare
                         size={15}
-                        className={isActive ? "text-[#DB2D28]" : "text-[#6D7C83]"}
+                        className={`shrink-0 ${isActive ? "text-[#DB2D28]" : "text-[#6D7C83]"}`}
                       />
 
                       {isEditing ? (
@@ -479,32 +508,32 @@ const Dashboard = () => {
                           }}
                           onBlur={(e) => handleSaveRename(e, chat._id)}
                           onClick={(e) => e.stopPropagation()}
-                          className="w-full rounded bg-[#070B0D] px-1 py-0.5 text-xs text-white outline-none ring-1 ring-[#DB2D28]"
+                          className="w-full min-w-0 rounded bg-[#070B0D] px-1 py-0.5 text-base text-white outline-none ring-1 ring-[#DB2D28] sm:text-xs"
                         />
                       ) : (
-                        <span className="truncate text-xs sm:text-sm">
-                          {chat.title}
-                        </span>
+                        <span className="truncate text-sm">{chat.title}</span>
                       )}
                     </div>
 
                     {!isEditing && (
-                      <div className="ml-2 flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
+                      <div className="ml-2 flex shrink-0 items-center gap-0.5 transition md:opacity-0 md:group-focus-within:opacity-100 md:group-hover:opacity-100">
                         <button
                           type="button"
                           onClick={(e) => handleStartRename(e, chat)}
                           title="Rename"
-                          className="rounded p-1 text-[#6D7C83] hover:bg-[#41494F]/40 hover:text-white"
+                          aria-label="Rename chat"
+                          className="rounded p-1.5 text-[#6D7C83] hover:bg-[#41494F]/40 hover:text-white"
                         >
-                          <Edit3 size={13} />
+                          <Edit3 size={14} />
                         </button>
                         <button
                           type="button"
                           onClick={(e) => handleDeleteChat(e, chat._id)}
                           title="Delete"
-                          className="rounded p-1 text-[#6D7C83] hover:bg-[#DB2D28]/20 hover:text-[#DB2D28]"
+                          aria-label="Delete chat"
+                          className="rounded p-1.5 text-[#6D7C83] hover:bg-[#DB2D28]/20 hover:text-[#DB2D28]"
                         >
-                          <Trash2 size={13} />
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     )}
@@ -516,10 +545,10 @@ const Dashboard = () => {
         </div>
 
         {/* User Footer Profile & Logout */}
-        <div className="border-t border-[#41494F]/70 bg-[#070B0D] p-3">
-          <div className="flex items-center justify-between rounded-xl border border-[#41494F]/60 bg-[#070B0D] p-2.5">
+        <div className="shrink-0 border-t border-[#41494F]/70 bg-[#070B0D] p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+          <div className="flex items-center justify-between gap-2 rounded-xl border border-[#41494F]/60 bg-[#070B0D] p-2.5">
             <div className="flex min-w-0 items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-tr from-[#DB2D28] to-[#A41715] text-xs font-semibold text-white shadow-sm">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-tr from-[#DB2D28] to-[#A41715] text-xs font-semibold text-white shadow-sm">
                 {user?.username ? user.username.charAt(0).toUpperCase() : "U"}
               </div>
               <div className="min-w-0 flex-1">
@@ -536,7 +565,8 @@ const Dashboard = () => {
               type="button"
               onClick={handleLogout}
               title="Logout"
-              className="rounded-lg p-1.5 text-[#6D7C83] transition hover:bg-[#DB2D28]/20 hover:text-[#DB2D28]"
+              aria-label="Logout"
+              className="shrink-0 rounded-lg p-2 text-[#6D7C83] transition hover:bg-[#DB2D28]/20 hover:text-[#DB2D28]"
             >
               <LogOut size={16} />
             </button>
@@ -545,28 +575,30 @@ const Dashboard = () => {
       </aside>
 
       {/* -------------------- MAIN CHAT CONTAINER -------------------- */}
-      <main className="flex flex-1 flex-col overflow-hidden bg-[#070B0D]">
+      <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#070B0D]">
         {/* Top Header Bar */}
-        <header className="flex h-16 items-center justify-between border-b border-[#41494F]/70 bg-[#070B0D]/90 px-4 backdrop-blur-md sm:px-6">
-          <div className="flex items-center gap-3">
+        <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-[#41494F]/70 bg-[#070B0D]/90 px-3 backdrop-blur-md sm:h-16 sm:px-6">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <button
               type="button"
-              className="rounded-lg p-1.5 text-[#6D7C83] hover:bg-[#41494F]/40 hover:text-white md:hidden"
-              onClick={() => setIsSidebarOpen(true)}
+              aria-label={isSidebarOpen ? "Close sidebar" : "Open sidebar"}
+              aria-expanded={isSidebarOpen}
+              className={`shrink-0 rounded-lg p-2 transition-colors hover:bg-[#41494F]/40 hover:text-white md:hidden ${
+                isSidebarOpen ? "text-white" : "text-[#6D7C83]"
+              }`}
+              onClick={() => setIsSidebarOpen((open) => !open)}
             >
-              <Menu size={20} />
+              <MenuToggleIcon open={isSidebarOpen} />
             </button>
 
             <div className="min-w-0">
-              <div className="flex min-w-0 items-center gap-2">
-                <h2 className="max-w-[42vw] truncate text-sm font-semibold text-white sm:max-w-none sm:text-base">
-                  {activeChat?.title || "New Conversation"}
-                </h2>
-              </div>
+              <h2 className="truncate text-sm font-semibold text-white sm:text-base">
+                {activeChat?.title || "New Conversation"}
+              </h2>
               <div className="flex items-center gap-1.5 font-mono text-[10px] text-[#6D7C83] sm:gap-2 sm:text-[11px]">
                 <span className="flex items-center gap-1 text-[#DB2D28]">
                   <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#DB2D28]" />
-                  Gemini 2.5 Flash
+                  Nexora AI
                 </span>
                 <span className="hidden sm:inline">•</span>
                 <span className="hidden sm:inline">Context-Aware Memory</span>
@@ -574,21 +606,20 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleCreateNewChat}
-              className="hidden items-center gap-1.5 rounded-xl border border-[#41494F] bg-[#070B0D] px-3.5 py-1.5 font-mono text-xs font-medium text-zinc-200 shadow-sm transition hover:border-[#DB2D28]/50 hover:text-white sm:flex"
-            >
-              <Plus size={14} className="text-[#DB2D28]" />
-              New Chat
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleCreateNewChat}
+            aria-label="New chat"
+            className="flex shrink-0 items-center gap-1.5 rounded-xl border border-[#41494F] bg-[#070B0D] p-2 font-mono text-xs font-medium text-zinc-200 shadow-sm transition hover:border-[#DB2D28]/50 hover:text-white sm:px-3.5 sm:py-1.5"
+          >
+            <Plus size={14} className="text-[#DB2D28]" />
+            <span className="hidden sm:inline">New Chat</span>
+          </button>
         </header>
 
         {/* Message Area */}
-        <div className="flex-1 overflow-y-auto px-3 py-4 sm:px-8 sm:py-6">
-          <div className="mx-auto max-w-3xl space-y-6">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-4 sm:px-8 sm:py-6">
+          <div className="mx-auto w-full max-w-3xl space-y-5 sm:space-y-6">
             {isLoadingMessages ? (
               <div className="flex h-64 items-center justify-center font-mono text-sm text-[#6D7C83]">
                 <div className="flex items-center gap-2">
@@ -598,18 +629,18 @@ const Dashboard = () => {
               </div>
             ) : messages.length === 0 ? (
               /* Empty State / Welcome Screen */
-              <div className="flex flex-col items-center justify-center pt-5 text-center sm:pt-14">
-                <div className="relative mb-5">
-                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[#DB2D28] to-[#A41715] blur-xl opacity-25" />
+              <div className="flex flex-col items-center justify-center pt-2 text-center sm:pt-14">
+                <div className="relative mb-4 sm:mb-5">
+                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[#DB2D28] to-[#A41715] opacity-25 blur-xl" />
                   <NexoraIcon size={56} className="relative shadow-2xl" />
                 </div>
 
                 <div className="inline-flex items-center gap-1.5 rounded-full border border-[#DB2D28]/40 bg-[#40080A]/40 px-3.5 py-1 font-mono text-xs font-medium text-[#DB2D28]">
                   <Sparkles size={12} />
-                  Engineered with Three.js & Gemini AI
+                  Your AI coding companion
                 </div>
 
-                <h1 className="mt-4 max-w-xl text-2xl font-bold tracking-tight text-white sm:text-4xl">
+                <h1 className="mt-4 max-w-xl text-balance text-2xl font-bold tracking-tight text-white sm:text-4xl">
                   What would you like to build today?
                 </h1>
                 <p className="mt-2 max-w-md px-2 text-sm text-[#6D7C83]">
@@ -617,7 +648,7 @@ const Dashboard = () => {
                 </p>
 
                 {/* Suggestions Grid */}
-                <div className="mt-6 grid w-full max-w-2xl gap-3 sm:mt-8 sm:grid-cols-2">
+                <div className="mt-6 grid w-full max-w-2xl grid-cols-1 gap-2.5 sm:mt-8 sm:grid-cols-2 sm:gap-3">
                   {SUGGESTIONS.map((s, idx) => {
                     const IconComponent = s.icon;
                     return (
@@ -625,7 +656,7 @@ const Dashboard = () => {
                         key={idx}
                         type="button"
                         onClick={() => handleSendMessage(s.prompt)}
-                        className="group flex min-w-0 flex-col items-start rounded-2xl border border-[#41494F]/80 bg-[#070B0D]/80 p-3.5 text-left transition duration-200 hover:-translate-y-0.5 hover:border-[#DB2D28]/50 hover:bg-[#40080A]/20 hover:shadow-xl sm:p-4"
+                        className="group flex min-w-0 flex-col items-start rounded-2xl border border-[#41494F]/80 bg-[#070B0D]/80 p-3.5 text-left transition duration-200 hover:border-[#DB2D28]/50 hover:bg-[#40080A]/20 hover:shadow-xl active:scale-[0.98] sm:p-4 sm:hover:-translate-y-0.5"
                       >
                         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#DB2D28]/15 text-[#DB2D28] group-hover:bg-[#DB2D28]/25">
                           <IconComponent size={16} />
@@ -633,9 +664,7 @@ const Dashboard = () => {
                         <span className="mt-3 text-sm font-semibold text-zinc-200 group-hover:text-white">
                           {s.title}
                         </span>
-                        <span className="mt-1 text-xs text-[#6D7C83]">
-                          {s.desc}
-                        </span>
+                        <span className="mt-1 text-xs text-[#6D7C83]">{s.desc}</span>
                       </button>
                     );
                   })}
@@ -643,15 +672,13 @@ const Dashboard = () => {
               </div>
             ) : (
               /* Messages Stream */
-              messages.map((message) => {
+              messages.map((message, index) => {
                 const isUser = message.role === "user";
 
                 return (
                   <div
-                    key={message._id || Math.random()}
-                    className={`flex gap-3 sm:gap-4 ${
-                      isUser ? "justify-end" : "justify-start"
-                    }`}
+                    key={message._id || `msg-${index}`}
+                    className={`flex gap-2.5 sm:gap-4 ${isUser ? "justify-end" : "justify-start"}`}
                   >
                     {!isUser && (
                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#070B0D] shadow-md ring-1 ring-[#DB2D28]/40">
@@ -659,16 +686,16 @@ const Dashboard = () => {
                       </div>
                     )}
 
-                    <div className="max-w-[85%] space-y-1.5 sm:max-w-[78%]">
+                    <div className="min-w-0 max-w-[88%] space-y-1.5 sm:max-w-[78%]">
                       <div
-                        className={`rounded-2xl px-5 py-4 ${
+                        className={`rounded-2xl px-3.5 py-3 sm:px-5 sm:py-4 ${
                           isUser
                             ? "rounded-tr-xs bg-gradient-to-r from-[#DB2D28] to-[#A41715] text-white shadow-lg shadow-[#DB2D28]/20"
                             : "rounded-tl-xs border border-[#41494F]/80 bg-[#070B0D] text-zinc-100 shadow-md backdrop-blur-sm"
                         }`}
                       >
                         {isUser ? (
-                          <p className="whitespace-pre-wrap text-sm leading-relaxed sm:text-[15px]">
+                          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed [overflow-wrap:anywhere] sm:text-[15px]">
                             {message.content}
                           </p>
                         ) : (
@@ -681,7 +708,7 @@ const Dashboard = () => {
                           <button
                             type="button"
                             onClick={() => handleCopyMessage(message._id, message.content)}
-                            className="flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-[#41494F]/30 hover:text-white"
+                            className="flex items-center gap-1 rounded px-1.5 py-1 hover:bg-[#41494F]/30 hover:text-white"
                           >
                             {copiedMessageId === message._id ? (
                               <>
@@ -705,17 +732,17 @@ const Dashboard = () => {
 
             {/* AI Thinking Animation */}
             {isSending && (
-              <div className="flex items-start gap-3">
+              <div className="flex items-start gap-2.5 sm:gap-3">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#070B0D] ring-1 ring-[#DB2D28]/40">
                   <NexoraIcon size={20} />
                 </div>
-                <div className="flex items-center gap-2.5 rounded-2xl rounded-tl-xs border border-[#41494F]/80 bg-[#070B0D] px-4 py-3 font-mono text-xs text-[#6D7C83] shadow-md">
-                  <div className="flex gap-1">
+                <div className="flex min-w-0 items-center gap-2.5 rounded-2xl rounded-tl-xs border border-[#41494F]/80 bg-[#070B0D] px-4 py-3 font-mono text-xs text-[#6D7C83] shadow-md">
+                  <div className="flex shrink-0 gap-1">
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#DB2D28] [animation-delay:-0.3s]" />
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#DB2D28] [animation-delay:-0.15s]" />
                     <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-[#DB2D28]" />
                   </div>
-                  <span>Nexora is crafting your answer...</span>
+                  <span className="truncate">Nexora is crafting your answer...</span>
                 </div>
               </div>
             )}
@@ -725,15 +752,15 @@ const Dashboard = () => {
         </div>
 
         {/* Input Bar */}
-        <div className="border-t border-[#41494F]/70 bg-[#070B0D]/90 p-4 backdrop-blur-md sm:px-8">
+        <div className="shrink-0 border-t border-[#41494F]/70 bg-[#070B0D]/90 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-md sm:px-8 sm:pb-[max(1rem,env(safe-area-inset-bottom))] sm:pt-4">
           <form
             onSubmit={(e) => {
               e.preventDefault();
               handleSendMessage();
             }}
-            className="mx-auto max-w-3xl"
+            className="mx-auto w-full max-w-3xl"
           >
-            <div className="relative flex items-center rounded-2xl border border-[#41494F] bg-[#070B0D] shadow-2xl transition focus-within:border-[#DB2D28]/60 focus-within:ring-2 focus-within:ring-[#DB2D28]/20">
+            <div className="relative flex items-end rounded-2xl border border-[#41494F] bg-[#070B0D] shadow-2xl transition focus-within:border-[#DB2D28]/60 focus-within:ring-2 focus-within:ring-[#DB2D28]/20">
               <textarea
                 ref={inputRef}
                 rows={1}
@@ -745,24 +772,26 @@ const Dashboard = () => {
                     handleSendMessage();
                   }
                 }}
-                placeholder="Ask Nexora a question or request code... (Shift+Enter for newline)"
-                className="w-full resize-none bg-transparent py-3.5 pl-4 pr-14 text-sm text-zinc-100 placeholder-[#6D7C83] outline-none sm:text-base"
+                placeholder="Ask Nexora anything..."
+                aria-label="Message Nexora"
+                className="max-h-40 w-full resize-none bg-transparent py-3.5 pl-4 pr-14 text-base text-zinc-100 placeholder-[#6D7C83] outline-none"
               />
 
               <button
                 type="submit"
+                aria-label="Send message"
                 disabled={!inputMessage.trim() || isSending}
-                className="absolute right-2.5 flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-r from-[#DB2D28] to-[#A41715] text-white shadow-md shadow-[#DB2D28]/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                className="absolute bottom-2 right-2.5 flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-r from-[#DB2D28] to-[#A41715] text-white shadow-md shadow-[#DB2D28]/30 transition hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Send size={15} />
               </button>
             </div>
 
-            <div className="mt-2 flex items-center justify-between px-1 font-mono text-[11px] text-[#6D7C83]">
+            <div className="mt-2 hidden items-center justify-between px-1 font-mono text-[11px] text-[#6D7C83] sm:flex">
               <span className="flex items-center gap-1">
                 <CornerDownLeft size={11} /> Enter to send • Shift + Enter for new line
               </span>
-              <span>Nexora • Powered by Gemini AI</span>
+              <span>Nexora AI</span>
             </div>
           </form>
         </div>
