@@ -24,6 +24,8 @@ const messageSchema = new mongoose.Schema(
   }
 );
 
+messageSchema.index({ chat: 1, createdAt: 1 });
+
 const MessageModel = mongoose.model("Message", messageSchema);
 
 export default MessageModel;

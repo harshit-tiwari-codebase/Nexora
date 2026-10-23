@@ -1,6 +1,6 @@
 import ChatModel from "../models/chat.model.js";
 import MessageModel from "../models/message.model.js";
-import { generateChatReply, generateChatTitle } from "../services/Ai.service.js";
+import { generateChatReply } from "../services/Ai.service.js";
 
 /**
  * @desc    Create a new chat conversation
@@ -32,9 +32,10 @@ export const createChat = async (req, res, next) => {
  */
 export const getAllChats = async (req, res, next) => {
   try {
-    const chats = await ChatModel.find({ user: req.userId }).sort({
-      updatedAt: -1,
-    });
+    const chats = await ChatModel.find({ user: req.userId })
+      .select("title createdAt updatedAt")
+      .sort({ updatedAt: -1 })
+      .lean();
 
     return res.status(200).json({
       success: true,
@@ -54,7 +55,7 @@ export const getChatById = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const chat = await ChatModel.findOne({ _id: id, user: req.userId });
+    const chat = await ChatModel.findOne({ _id: id, user: req.userId }).lean();
 
     if (!chat) {
       return res.status(404).json({
@@ -64,9 +65,10 @@ export const getChatById = async (req, res, next) => {
     }
 
     // Get all messages for this chat in chronological order
-    const messages = await MessageModel.find({ chat: chat._id }).sort({
-      createdAt: 1,
-    });
+    const messages = await MessageModel.find({ chat: chat._id })
+      .select("chat content role createdAt updatedAt")
+      .sort({ createdAt: 1 })
+      .lean();
 
     return res.status(200).json({
       success: true,
@@ -105,35 +107,37 @@ export const sendMessage = async (req, res, next) => {
       });
     }
 
-    // 1. Fetch existing message history for context
+    // Load only the recent context the model consumes, without hydrating Mongoose documents.
     const previousMessages = await MessageModel.find({ chat: chat._id })
-      .sort({ createdAt: 1 })
-      .select("role content");
+      .sort({ createdAt: -1 })
+      .limit(15)
+      .select("role content -_id")
+      .lean();
+    previousMessages.reverse();
 
-    // 2. Save user's message in the database
+    // Save the user's message before requesting the model so it is retained on provider errors.
     const userMessage = await MessageModel.create({
       chat: chat._id,
       content: content.trim(),
       role: "user",
     });
 
-    // 3. Generate AI reply using Gemini
+    // Generate the reply using the bounded recent history.
     const aiContent = await generateChatReply({
       history: previousMessages,
       prompt: content.trim(),
     });
 
-    // 4. Save AI's response in the database
     const aiMessage = await MessageModel.create({
       chat: chat._id,
       content: aiContent,
       role: "ai",
     });
 
-    // 5. If this is the first message or title is default, generate an intelligent title
+    // Avoid a second Gemini request; derive a useful title from the first prompt.
     if (chat.title === "New Chat" || previousMessages.length === 0) {
-      const generatedTitle = await generateChatTitle(content.trim());
-      chat.title = generatedTitle;
+      const title = content.trim().replace(/\s+/g, " ");
+      chat.title = title.length > 40 ? `${title.slice(0, 37).trimEnd()}...` : title;
     }
 
     // Update the timestamp on the chat
