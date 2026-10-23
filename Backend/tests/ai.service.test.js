@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  generateChatReply,
   getRetryAfterSeconds,
   toAiProviderError,
 } from "../src/services/Ai.service.js";
@@ -36,4 +37,51 @@ test("maps other provider failures without exposing provider internals", () => {
   assert.equal(error.statusCode, 502);
   assert.equal(error.code, "AI_PROVIDER_UNAVAILABLE");
   assert.doesNotMatch(error.message, /private provider diagnostic/);
+});
+
+test("maps a Groq rate limit and preserves its retry-after header", () => {
+  const error = toAiProviderError({
+    status: 429,
+    retryAfter: 30,
+    message: "Groq rate limit exceeded",
+  });
+
+  assert.equal(error.statusCode, 429);
+  assert.equal(error.code, "AI_QUOTA_EXCEEDED");
+  assert.equal(error.retryAfterSeconds, 30);
+});
+
+test("generates a reply with Groq when Gemini is not configured", async () => {
+  const previousGeminiKey = process.env.GEMINI_API_KEY;
+  const previousGroqKey = process.env.GROQ_API_KEY;
+  const previousFetch = globalThis.fetch;
+
+  process.env.GEMINI_API_KEY = "";
+  process.env.GROQ_API_KEY = "test-groq-key";
+  globalThis.fetch = async (url, options) => {
+    assert.equal(url, "https://api.groq.com/openai/v1/chat/completions");
+    assert.equal(options.headers.Authorization, "Bearer test-groq-key");
+
+    return {
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { content: "Groq test response" } }],
+      }),
+    };
+  };
+
+  try {
+    assert.equal(
+      await generateChatReply({ history: [], prompt: "Hello" }),
+      "Groq test response"
+    );
+  } finally {
+    if (previousGeminiKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = previousGeminiKey;
+
+    if (previousGroqKey === undefined) delete process.env.GROQ_API_KEY;
+    else process.env.GROQ_API_KEY = previousGroqKey;
+
+    globalThis.fetch = previousFetch;
+  }
 });

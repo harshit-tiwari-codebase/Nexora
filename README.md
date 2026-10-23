@@ -99,7 +99,7 @@ Nexora/
 - Node.js (v18 or higher)
 - npm or yarn
 - MongoDB connection string (local or MongoDB Atlas)
-- Google Gemini API key
+- Google Gemini API key, Groq API key, or both for provider fallback
 
 ### 1. Backend Setup
 ```bash
@@ -113,6 +113,7 @@ PORT=8000
 MONGODB_URI=your_mongodb_connection_string
 JWT_SECRET=your_jwt_secret_key
 GEMINI_API_KEY=your_gemini_api_key
+GROQ_API_KEY=your_groq_api_key
 CLIENT_URL=http://localhost:5173
 ```
 Start the backend server:
@@ -174,7 +175,8 @@ docker-compose up --build -d
    - `PORT`: `8000` (or dynamic port provided by host)
    - `MONGODB_URI`: Production MongoDB Atlas URI (the legacy `MONGO_URI` name is also accepted)
    - `JWT_SECRET`: High-entropy secret string
-   - `GEMINI_API_KEY`: Google AI Studio API Key
+   - `GEMINI_API_KEY`: Google AI Studio API key (optional if Groq is configured)
+   - `GROQ_API_KEY`: Groq API key (optional; used as fallback after Gemini, or by itself)
    - `CLIENT_URL`: URL of your deployed Frontend; this origin is allowed for both the REST API and Socket.IO (e.g. `https://nexora.vercel.app`)
    - `VITE_API_URL` (Frontend): URL of your deployed Backend (e.g. `https://nexora-backend-48xn.onrender.com`)
 
@@ -182,7 +184,7 @@ docker-compose up --build -d
 
    `GET /api/health` reports whether the API and MongoDB are ready. For an external uptime monitor, use this URL as its health-check target. A monitor can send inbound requests periodically and reduce idle spin-down, but a health endpoint cannot guarantee a Render free instance remains running; use an always-on service plan when persistent availability is required.
 
-   Chat generation disables automatic provider retries so exhausted Gemini quotas return promptly as HTTP 429 with retry timing instead of waiting through long retries and appearing as a server error. A 429 still requires waiting for Google's quota reset or raising the Gemini project's quota.
+   Chat generation tries the configured Gemini models first and falls back to Groq when Gemini is rate-limited or unavailable. Gemini automatic retries are disabled to avoid long waits. Provider free-tier quotas and rate limits still apply; fallback improves availability but does not provide unlimited usage.
 
 ---
 
