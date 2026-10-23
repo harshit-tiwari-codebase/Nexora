@@ -652,7 +652,7 @@ const Dashboard = () => {
   const activeChat = chats.find((c) => c._id === activeChatId);
 
   return (
-    <div className="flex h-dvh w-full overflow-hidden bg-[#070B0D] text-zinc-100">
+    <div className="dashboard-viewport flex w-full min-w-0 overflow-hidden bg-[#070B0D] text-zinc-100">
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div
@@ -888,26 +888,26 @@ const Dashboard = () => {
               </div>
             ) : messages.length === 0 ? (
               /* Empty State / Welcome Screen */
-              <div className="flex flex-col items-center justify-center pt-2 text-center sm:pt-14">
-                <div className="relative mb-4 sm:mb-5">
+              <div className="dashboard-welcome flex flex-col items-center justify-center pt-1 text-center sm:pt-14">
+                <div className="dashboard-welcome-icon relative mb-3 sm:mb-5">
                   <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-[#DB2D28] to-[#A41715] opacity-25 blur-xl" />
-                  <NexoraIcon size={56} className="relative shadow-2xl" />
+                  <NexoraIcon size={48} className="relative shadow-2xl sm:h-14 sm:w-14" />
                 </div>
 
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-[#DB2D28]/40 bg-[#40080A]/40 px-3.5 py-1 font-mono text-xs font-medium text-[#DB2D28]">
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-[#DB2D28]/40 bg-[#40080A]/40 px-3 py-1 font-mono text-[11px] font-medium text-[#DB2D28] sm:px-3.5 sm:text-xs">
                   <Sparkles size={12} />
                   Your AI coding companion
                 </div>
 
-                <h1 className="mt-4 max-w-xl text-balance text-2xl font-bold tracking-tight text-white sm:text-4xl">
+                <h1 className="mt-3 max-w-xl text-balance text-xl font-bold tracking-tight text-white sm:mt-4 sm:text-4xl">
                   What would you like to build today?
                 </h1>
-                <p className="mt-2 max-w-md px-2 text-sm text-[#6D7C83]">
+                <p className="dashboard-welcome-description mt-1.5 max-w-md px-2 text-xs text-[#6D7C83] sm:mt-2 sm:text-sm">
                   Nexora provides intelligent code generation, architecture planning, debugging, and software tutoring.
                 </p>
 
                 {/* Suggestions Grid */}
-                <div className="mt-6 grid w-full max-w-2xl grid-cols-1 gap-2.5 sm:mt-8 sm:grid-cols-2 sm:gap-3">
+                <div className="dashboard-welcome-suggestions mt-4 grid w-full max-w-2xl grid-cols-2 gap-2 sm:mt-8 sm:gap-3">
                   {SUGGESTIONS.map((s, idx) => {
                     const IconComponent = s.icon;
                     return (
@@ -915,15 +915,15 @@ const Dashboard = () => {
                         key={idx}
                         type="button"
                         onClick={() => handleSendMessage(s.prompt)}
-                        className="group flex min-w-0 flex-col items-start rounded-2xl border border-[#41494F]/80 bg-[#070B0D]/80 p-3.5 text-left transition duration-200 hover:border-[#DB2D28]/50 hover:bg-[#40080A]/20 hover:shadow-xl active:scale-[0.98] sm:p-4 sm:hover:-translate-y-0.5"
+                        className="group flex min-w-0 flex-col items-start rounded-2xl border border-[#41494F]/80 bg-[#070B0D]/80 p-2.5 text-left transition duration-200 hover:border-[#DB2D28]/50 hover:bg-[#40080A]/20 hover:shadow-xl active:scale-[0.98] sm:p-4 sm:hover:-translate-y-0.5"
                       >
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#DB2D28]/15 text-[#DB2D28] group-hover:bg-[#DB2D28]/25">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#DB2D28]/15 text-[#DB2D28] group-hover:bg-[#DB2D28]/25 sm:h-8 sm:w-8">
                           <IconComponent size={16} />
                         </div>
-                        <span className="mt-3 text-sm font-semibold text-zinc-200 group-hover:text-white">
+                        <span className="mt-2 text-xs font-semibold text-zinc-200 group-hover:text-white sm:mt-3 sm:text-sm">
                           {s.title}
                         </span>
-                        <span className="mt-1 text-xs text-[#6D7C83]">{s.desc}</span>
+                        <span className="mt-1 text-[10px] leading-snug text-[#6D7C83] sm:text-xs sm:leading-normal">{s.desc}</span>
                       </button>
                     );
                   })}
